@@ -105,6 +105,9 @@ buffer_content = ""
 # File number
 nofile = 1
 
+# Timer started when reading
+time_receiving = 0
+
 # Main loop, exit when key 'q' is pressed
 while not key == 'q':
     
@@ -115,46 +118,54 @@ while not key == 'q':
     # Read byte for byte and display on output
     readbyte = ser.read(1)
 
-    if not readbyte == '':
-        # Send by the instrument for end-of-stream
-        if ord(readbyte) == 12:
-            # Print length of buffer (+1 is the terminal byte, which is not added to the buffer but was received!)
-            print("%d bytes received" % (len(buffer_content)+1))
-            
-            # Print buffer
-            print(buffer_content)
+    time_elapsed = 0
+    if time_receiving > 0:
+        time_elapsed = time.time() - time_receiving
 
-            # Generate filename
-            timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-            filename = "Data " + ("%03d" % nofile) + ".txt"
+    # Send by the instrument for end-of-stream or timeout (3 seconds)
+    if (readbyte is not '' and ord(readbyte) == 12) or (time_elapsed > 3):
+        # Print length of buffer (+1 is the terminal byte, which is not added to the buffer but was received!)
+        print("%d bytes received" % (len(buffer_content)+1))
 
-            # Print message to user
-            print("Data written to '" + filename + "'.")
+        # Print buffer
+        print(buffer_content)
 
-            # Open file 
-            datafile = open( foldername + '/' + filename, "w")
+        # Generate filename
+        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        filename = "Data " + ("%03d" % nofile) + ".txt"
 
-            # Write to file
-            datafile.write("Data recorded as set of '" + foldername + "' at " + timestamp + ".\r\n")
-            datafile.write(buffer_content)
+        # Print message to user
+        print("Data written to '" + filename + "'.")
 
-            # Close file
-            datafile.close()
+        # Open file
+        datafile = open(foldername + '/' + filename, "w")
 
-            # Empty the buffer
-            buffer_content = ""
+        # Write to file
+        datafile.write("Data recorded as set of '" + foldername + "' at " + timestamp + ".\r\n")
+        datafile.write(buffer_content)
 
-            # Increase file number
-            nofile += 1
-            
-        # All other characters will go directly in our buffer
-        else:
-            # Buffer was empty before? Then print status message for user
-            if len(buffer_content) == 0:
-                print("Receiving data..."),
+        # Close file
+        datafile.close()
 
-            # Add read byte to buffer    
-            buffer_content += readbyte            
+        # Empty the buffer
+        buffer_content = ""
+
+        # Increase file number
+        nofile += 1
+
+        # Reset stopwatch
+        time_receiving = 0
+
+    # All other characters will go directly in our buffer
+    elif readbyte is not '':
+        time_receiving = time.time()
+
+        # Buffer was empty before? Then print status message for user
+        if len(buffer_content) == 0:
+            print("Receiving data..."),
+
+        # Add read byte to buffer
+        buffer_content += readbyte
     
 
 # Set the console input back to normal
